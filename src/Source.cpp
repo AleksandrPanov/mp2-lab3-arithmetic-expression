@@ -1,50 +1,12 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <stack>
+#include <set>
 using namespace std;
 
-// Document, standart
-// компилятор
-// gcc
-// mvsc, gcc, clang, icc
-
-// Арифмитические выражения
-// Калькулятор
-// input data:
-//      std::string, арифмитическое выражение вида: 7+3-2-(-5)*4+3^2
-// output data:
-// 1. проверка корректности выражения: ++)2(-3532-5+3)(25235++2352(35---235
-// 2. вычислить выражение
-// список поддерживаемых операций (+,-,*,/,^, un -) и фич (поддержка переменных x, y, z; 
-// поддержка функций sin, cos, ...; поддержка десятичных дробей 3.14)
-
-// арифмитические знаки ~ оператор
-// бинарный оператор f  // (a1, a2)
-// унарный оператор f   // (a1)
-// тернарный оператор f // (a1, a2, a3)
-// ...
-// число, переменная или выражение ~ операнд
-// 123, x, (sin(7)*2+3)
-
-// Текущее состояние ~ текущая, обрабатываемая лексема.
-
-
-// первый в выражении:
-// унарный оператор или операнд или (
-
-// унарный оператор, что может идти за ним?
-// (, операнд
-
-// операнд (число, переменная), что может идти за ним?
-// бинарный оператор, ), конец выражения
-
-
-// бинарный оператор (+, -, /, *, ^),  что может идти за ним?
-// операнд, (
-
-// "(" что может идти за ней?
-// опернад, унарный оператор
-
+//оператор ^ не работает корректно не учтена правая ассоциативность
+//для корректной работы используйте скобки: 2^(3^2) вместо 2^3^2
 enum class TypeLexeme
 {
 	number,
@@ -53,8 +15,6 @@ enum class TypeLexeme
 	bin_op,
 	left_bracket,
 	right_bracket,
-	sin,
-	cos,
 	error
 };
 
@@ -84,10 +44,9 @@ enum class LexemeState
 	left_bracket,
 	right_bracket,
 	end,
-	sincos,
 	error
 };
-
+bool check_arithmetic_expression(const std::string& s);
 Lexeme convertToLexeme(const std::string &expression, size_t &index, LexemeState state)
 {
 	std::string value;
@@ -130,13 +89,13 @@ Lexeme convertToLexeme(const std::string &expression, size_t &index, LexemeState
 		index++;
 		return Lexeme({ TypeLexeme::un_op, value, Priority::high });
 	}
-	else if (expression[index] == '(' && (state == LexemeState::sincos || state == LexemeState::bin_op || state == LexemeState::start || state == LexemeState::un_op))
+	else if (expression[index] == '(' && (state == LexemeState::bin_op || state == LexemeState::start || state == LexemeState::un_op))
 	{
 		value.push_back(expression[index]);
 		index++;
 		return Lexeme({ TypeLexeme::left_bracket, value, Priority::bracket });
 	}
-	else if (expression[index] == ')' && (state == LexemeState::variable || state == LexemeState::number))
+	else if (expression[index] == ')' && (state == LexemeState::variable || state == LexemeState::number || state == LexemeState::right_bracket))
 	{
 		value.push_back(expression[index]);
 		index++;
@@ -148,13 +107,13 @@ Lexeme convertToLexeme(const std::string &expression, size_t &index, LexemeState
 		{
 			value = "sin";
 			index += 3;
-			return Lexeme({ TypeLexeme::sin, value, Priority::high });
+			return Lexeme({ TypeLexeme::un_op, value, Priority::high });
 		}
 		else if (expression.substr(index, 3) == "cos")
 		{
 			value = "cos";
 			index += 3;
-			return Lexeme({ TypeLexeme::cos, value, Priority::high });
+			return Lexeme({ TypeLexeme::un_op, value, Priority::high });
 		}
 	}
 	else if (expression[index] >= 'a' && expression[index] <= 'z')
@@ -166,13 +125,6 @@ Lexeme convertToLexeme(const std::string &expression, size_t &index, LexemeState
 	return Lexeme({ TypeLexeme::error, value, Priority::low });
 }
 
-// все лексемы состоят из одного символа, то есть число 12345 недопустимо
-// нужно проконтролировать корректность скобок
-// счетчик скобок scopeCounter
-// if (scope == '(') scopeCounter++;
-// if (scope == ')') scopeCounter--;
-// в каждый момент scopeCounter >= 0
-// (()))(
 std::vector<Lexeme> convertStrToLexemes(const std::string& expression)
 {
 	int scopeCounter = 0;
@@ -197,10 +149,6 @@ std::vector<Lexeme> convertStrToLexemes(const std::string& expression)
 				state = LexemeState::left_bracket;
 				scopeCounter++;
 			}
-			else if (lexeme.type == TypeLexeme::sin || lexeme.type == TypeLexeme::cos)
-			{
-				state = LexemeState::sincos;
-			}
 			else throw "Error: invalid expression format (start lexeme is incorrect)";
 		}
 		else if (state == LexemeState::un_op)
@@ -209,9 +157,9 @@ std::vector<Lexeme> convertStrToLexemes(const std::string& expression)
 			{
 				state = LexemeState::variable;
 			}
-			else if (lexeme.type == TypeLexeme::sin || lexeme.type == TypeLexeme::cos)
+			else if (lexeme.type == TypeLexeme::un_op)
 			{
-				state = LexemeState::sincos;
+				state = LexemeState::un_op;
 			}
 			else if (lexeme.type == TypeLexeme::left_bracket)
 			{
@@ -244,9 +192,9 @@ std::vector<Lexeme> convertStrToLexemes(const std::string& expression)
 				state = LexemeState::left_bracket;
 				scopeCounter++;
 			}
-			else if (lexeme.type == TypeLexeme::sin || lexeme.type == TypeLexeme::cos)
+			else if (lexeme.type == TypeLexeme::un_op)
 			{
-				state = LexemeState::sincos;
+				state = LexemeState::un_op;
 			}
 			else throw "Error: invalid expression after a binary operator";
 		}
@@ -265,9 +213,9 @@ std::vector<Lexeme> convertStrToLexemes(const std::string& expression)
 			{
 				state = LexemeState::variable;
 			}
-			else if (lexeme.type == TypeLexeme::sin || lexeme.type == TypeLexeme::cos)
+			else if (lexeme.type == TypeLexeme::un_op)
 			{
-				state = LexemeState::sincos;
+				state = LexemeState::un_op;
 			}
 			else throw "Error: invalid expression after a left bracket";
 		}
@@ -284,19 +232,6 @@ std::vector<Lexeme> convertStrToLexemes(const std::string& expression)
 			}
 			else throw "Error: invalid expression after a right bracket";
 		}
-		else if (state == LexemeState::sincos)
-		{
-			if (lexeme.type == TypeLexeme::variable)
-			{
-				state = LexemeState::variable;
-			}
-			else if (lexeme.type == TypeLexeme::left_bracket)
-			{
-				state = LexemeState::left_bracket;
-				scopeCounter++;
-			}
-			else throw "Error: invalid sin/cos argument";
-		}
 		else if (scopeCounter < 0) throw "Error: brackets are out of order";
 		else throw "error";
 		res.push_back(lexeme);
@@ -304,16 +239,140 @@ std::vector<Lexeme> convertStrToLexemes(const std::string& expression)
 	return res;
 }
 
-// 2^3/4
+std::vector<Lexeme> reverse_Polish_notation(const std::vector<Lexeme> &src)
+{
+	std::vector<Lexeme> out;
+	std::stack<Lexeme> op_stack;
+	for (const Lexeme &lex : src)
+	{
+		if (lex.type == TypeLexeme::variable || lex.type == TypeLexeme::number)
+		{
+			out.push_back(lex);
+		}
+		else if (lex.type == TypeLexeme::left_bracket || lex.type == TypeLexeme::un_op)
+		{
+			op_stack.push(lex);
+		}
+		else if (lex.type == TypeLexeme::right_bracket)
+		{
+			while (!op_stack.empty() && (op_stack.top().type != TypeLexeme::left_bracket))
+			{
+				out.push_back(op_stack.top());
+				op_stack.pop();
+			}
+			op_stack.pop();
+		}
+		else if (lex.type == TypeLexeme::bin_op)
+		{
+			while (!op_stack.empty() && (op_stack.top().type == TypeLexeme::un_op || op_stack.top().priority >= lex.priority))
+			{
+				out.push_back(op_stack.top());
+				op_stack.pop();
+			}
+			op_stack.push(lex);
+		}
+	}
+	while (!op_stack.empty())
+	{
+		out.push_back(op_stack.top());
+		op_stack.pop();
+	}
+	return out;
+}
+
+double calc_rpn(std::vector<Lexeme> &src_rpn)
+{
+	std::stack<double> tmp_stack;
+	for (size_t i = 0; i < src_rpn.size(); ++i)
+	{
+		if (src_rpn[i].type == TypeLexeme::un_op)
+		{
+			if (src_rpn[i].value == "-")
+			{
+				double operand = tmp_stack.top();
+				tmp_stack.pop();
+				tmp_stack.push(-operand);
+			}
+			else if (src_rpn[i].value == "sin")
+			{
+				double operand = tmp_stack.top();
+				tmp_stack.pop();
+				tmp_stack.push(sin(operand));
+			}
+			else if (src_rpn[i].value == "cos")
+			{
+				double operand = tmp_stack.top();
+				tmp_stack.pop();
+				tmp_stack.push(cos(operand));
+			}
+		}
+		else if (src_rpn[i].type == TypeLexeme::number || src_rpn[i].type == TypeLexeme::variable)
+		{
+			tmp_stack.push(stoi(src_rpn[i].value));
+		}
+		else if (src_rpn[i].type == TypeLexeme::bin_op)
+		{
+			double second_operand = tmp_stack.top();
+			tmp_stack.pop();
+			double first_operand = tmp_stack.top();
+			tmp_stack.pop();
+			if (src_rpn[i].value == "+")
+			{
+				tmp_stack.push(first_operand + second_operand);
+			}
+			else if (src_rpn[i].value == "-")
+			{
+				tmp_stack.push(first_operand - second_operand);
+			}
+			else if (src_rpn[i].value == "*")
+			{
+				tmp_stack.push(first_operand * second_operand);
+			}
+			else if (src_rpn[i].value == "^")
+			{
+				tmp_stack.push(std::pow(first_operand, second_operand));
+			}
+			else if (src_rpn[i].value == "/")
+			{
+				if (second_operand == 0) throw "Division by zero";
+				tmp_stack.push(first_operand / second_operand);
+			}
+		}
+	}
+	return tmp_stack.top();
+}
 
 int main()
 {
-	std::vector<Lexeme> test = convertStrToLexemes("-3+19*sin(x)+(-3)+18*cos(2398)");
-	for (int i = 0; i < test.size(); i++)
+	std::string expression("-3+19^5*(-sin(x))-(-3)+18*cos(y)");
+	std::vector<Lexeme> lexems = convertStrToLexemes(expression);
+	std::set<char> variables;
+	for (size_t i = 0; i < lexems.size(); ++i)
 	{
-		std::cout << test[i].value << '\t' << static_cast<int>(test[i].type) << std::endl;
+		if (lexems[i].type == TypeLexeme::variable)
+		{
+			variables.insert(lexems[i].value[0]);
+		}
 	}
-	getchar();
+	std::set<char>::iterator it = variables.begin();
+	while (it != variables.end())
+	{
+		double variable_value;
+		std::cout << "Enter the value of " << *it << ": " << std::endl;
+		std::cin >> variable_value;
+		for (size_t j = 0; j < lexems.size(); ++j)
+		{
+			if (lexems[j].value[0] == *it)
+			{
+				lexems[j].value = std::to_string(variable_value);
+				lexems[j].type = TypeLexeme::number;
+			}
+		}
+		it++;
+	}
+	std::vector<Lexeme> RPN = reverse_Polish_notation(lexems);
+	std::cout << calc_rpn(RPN);
+	system("pause");
 	return 0;
 }
 
