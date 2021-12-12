@@ -449,11 +449,12 @@ bool check_scops_in_expression(const std::string& str)
 }
 int main()
 {
-	std::string str = "2^0.5+(10.5+(-12)+arcsin1)*sin9^2+ln5";
+	std::cout << "left index- index of left scope,right index- index of right scope" << std::endl;
+	std::string str = "2^0.5+(10.5+(-12)+arcsin(1))*sin(9^2)+ln5";
 	if (check_scops_in_expression(str)) {
 		std::vector<Lexeme> test = convertStrtoLex(str);
 		auto res = reverse(test);
-		std::cout << calculate_reverse(res) << std::endl;
+		std::cout << "result is -"<<calculate_reverse(res) << std::endl;
 	}
 	check_scops_in_expression("(123+(12-6*(12))*(7)");
 	check_scops_in_expression("(123+(12-6*(12))*(7)+8)+9)+10)");
