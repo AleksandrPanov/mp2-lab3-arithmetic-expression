@@ -1,13 +1,15 @@
 //Anton Yarakhtin
 #pragma once
+#include <memory>
 #include <cmath>
 #include <unordered_map>
 #include <sstream>
 
+using TokenMap = std::unordered_map<std::string, std::unique_ptr<Tokens::Token>>;
+
 namespace Tokens 
 {
 	class Token;
-	using TokenMap = std::unordered_map<std::string, std::unique_ptr<Token>>;
 
 	enum class Type : int
 	{
