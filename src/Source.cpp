@@ -47,7 +47,7 @@ enum class LexemeState
 	error
 };
 bool check_arithmetic_expression(const std::string& s);
-Lexeme convertToLexeme(const std::string &expression, size_t &index)
+Lexeme convertToLexeme(const std::string &expression, size_t &index, LexemeState state)
 {
 	std::string value;
 	if (expression[index] >= '0' && expression[index] <= '9')
@@ -77,13 +77,13 @@ Lexeme convertToLexeme(const std::string &expression, size_t &index)
 		index++;
 		return Lexeme({ TypeLexeme::bin_op, value, Priority::high });
 	}
-	else if (expression[index] == '+' || expression[index] == '-' )
+	else if (expression[index] == '+' || (expression[index] == '-' && (state == LexemeState::variable || state == LexemeState::number || state == LexemeState::right_bracket)))
 	{
 		value.push_back(expression[index]);
 		index++;
 		return Lexeme({ TypeLexeme::bin_op, value, Priority::low });
 	}
-	else if (expression[index] == '-')
+	else if (expression[index] == '-' && (state == LexemeState::left_bracket || state == LexemeState::start))
 	{
 		value.push_back(expression[index]);
 		index++;
