@@ -47,7 +47,7 @@ enum class LexemeState
 	error
 };
 bool check_arithmetic_expression(const std::string& s);
-Lexeme convertToLexeme(const std::string &expression, size_t &index, LexemeState state)
+Lexeme convertToLexeme(const std::string &expression, size_t &index)
 {
 	std::string value;
 	if (expression[index] >= '0' && expression[index] <= '9')
@@ -77,31 +77,31 @@ Lexeme convertToLexeme(const std::string &expression, size_t &index, LexemeState
 		index++;
 		return Lexeme({ TypeLexeme::bin_op, value, Priority::high });
 	}
-	else if (expression[index] == '+' || (expression[index] == '-' && (state == LexemeState::variable || state == LexemeState::number || state == LexemeState::right_bracket)))
+	else if (expression[index] == '+' || expression[index] == '-' )
 	{
 		value.push_back(expression[index]);
 		index++;
 		return Lexeme({ TypeLexeme::bin_op, value, Priority::low });
 	}
-	else if (expression[index] == '-' && (state == LexemeState::left_bracket || state == LexemeState::start))
+	else if (expression[index] == '-')
 	{
 		value.push_back(expression[index]);
 		index++;
 		return Lexeme({ TypeLexeme::un_op, value, Priority::high });
 	}
-	else if (expression[index] == '(' && (state == LexemeState::bin_op || state == LexemeState::start || state == LexemeState::un_op))
+	else if (expression[index] == '(')
 	{
 		value.push_back(expression[index]);
 		index++;
 		return Lexeme({ TypeLexeme::left_bracket, value, Priority::bracket });
 	}
-	else if (expression[index] == ')' && (state == LexemeState::variable || state == LexemeState::number || state == LexemeState::right_bracket))
+	else if (expression[index] == ')')
 	{
 		value.push_back(expression[index]);
 		index++;
 		return Lexeme({ TypeLexeme::right_bracket, value, Priority::bracket });
 	}
-	else if ((expression.substr(index, 3) == "sin" || expression.substr(index, 3) == "cos") && (state == LexemeState::un_op || state == LexemeState::left_bracket || state == LexemeState::bin_op || state == LexemeState::start))
+	else if (expression.substr(index, 3) == "sin" || expression.substr(index, 3) == "cos")
 	{
 		if (expression.substr(index, 3) == "sin")
 		{
