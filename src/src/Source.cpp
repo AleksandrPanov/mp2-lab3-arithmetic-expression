@@ -4,9 +4,7 @@
 #include <cstdlib>
 #include <cmath>
 using namespace std;
-
 #define PI 3.14159265358979323846
-#define EXP 2.71828182845904523536
 
 enum class TypeLexeme {
 	number,
