@@ -1,0 +1,480 @@
+#include <iostream>
+#include <vector>
+#include <string>
+#include <stack>
+#include <cmath>
+using namespace std;
+#define PI 3.14159265358979323846
+#define EXP 2.71828182845904523536
+// Арифмитические выражения
+// Калькулятор
+// input data:
+//      std::string, арифмитическое выражение вида: 7+3-2-(-5)*4+3^2
+// output data:
+// 1. проверка корректности выражения: ++)2(-3532-5+3)(25235++2352(35---235
+// 2. вычислить выражение
+// список поддерживаемых операций (+,-,*,/,^, un -) и фич (поддержка переменных x, y, z; 
+// поддержка функций sin, cos, ...; поддержка десятичных дробей 3.14)
+
+// арифмитические знаки ~ оператор
+// бинарный оператор f  // (a1, a2)
+// унарный оператор f   // (a1)
+// тернарный оператор f // (a1, a2, a3)
+// ...
+// число, переменная или выражение ~ операнд
+// 123, x, (sin(7)*2+3)
+
+// Текущее состояние ~ текущая, обрабатываемая лексема.
+
+// первый в выражении:
+// унарный оператор или операнд или (
+
+// унарный оператор, что может идти за ним?
+// (, операнд
+
+// операнд (число, переменная), что может идти за ним?
+// бинарный оператор, ), конец выражения
+
+// бинарный оператор (+, -, /, *, ^),  что может идти за ним?
+// операнд, (
+
+// "(" что может идти за ней?
+// опернад, унарный оператор
+
+enum class TypeLexeme
+{
+	number,
+	variable,
+	un_op,
+	bin_op,
+	left_scope,
+	right_scope,
+	error
+};
+
+enum class Priority
+{
+	number,
+	scope,
+	low,
+	mid,
+	hight
+};
+
+struct Lexeme
+{
+	TypeLexeme type;
+	std::string value;
+	Priority priority;
+};
+
+enum class LexemeState
+{
+	start,
+	number,
+	variable,
+	un_op,
+	bin_op,
+	left_scope,
+	right_scope,
+	end,
+	error
+};
+Lexeme convertToLexeme(const std::string& expression, size_t& index, LexemeState state)
+{
+	std::string value;
+	if (expression[index] >= '0' && expression[index] <= '9')
+	{
+		while (expression[index] >= '0' && expression[index] <= '9')
+		{
+			value.push_back(expression[index++]);
+		}
+		return Lexeme({ TypeLexeme::number, value, Priority::number });
+	}
+	else if (expression[index] == '*' || expression[index] == '/')
+	{
+		value.push_back(expression[index++]);
+		return Lexeme({ TypeLexeme::bin_op, value, Priority::mid });
+	}
+	else if (expression[index] == '^')
+	{
+		value.push_back(expression[index++]);
+		return Lexeme({ TypeLexeme::bin_op, value, Priority::hight });
+	}
+	else if (expression[index] == '-' && (state == LexemeState::start || state == LexemeState::left_scope))
+	{
+		value.push_back(expression[index++]);
+		return Lexeme({ TypeLexeme::un_op, value, Priority::hight });
+	}
+	else if (expression[index] == '+' || (expression[index] == '-'))
+	{
+		value.push_back(expression[index++]);
+		return Lexeme({ TypeLexeme::bin_op, value, Priority::low });
+	}
+	else if (expression[index] == '(')
+	{
+		value.push_back(expression[index++]);
+		return Lexeme({ TypeLexeme::left_scope, value, Priority::scope });
+	}
+	else if (expression[index] == ')')
+	{
+		value.push_back(expression[index++]);
+		return Lexeme({ TypeLexeme::right_scope, value, Priority::scope });
+	}
+	else if (expression.substr(index, 3) == "sin" || expression.substr(index, 3) == "cos" || expression.substr(index, 3) == "ctg")
+	{
+		value = expression.substr(index, 3);
+		index += 3;
+		return Lexeme({ TypeLexeme::un_op, value, Priority::hight });
+	}
+	else if (expression.substr(index, 2) == "tg" || expression.substr(index, 2) == "ln")
+	{
+		value = expression.substr(index, 2);
+		index += 2;
+		return Lexeme({ TypeLexeme::un_op, value, Priority::hight });
+	}
+	else if (expression.substr(index, 6) == "arcsin" || expression.substr(index, 6) == "arccos" || expression.substr(index, 6) == "arcctg")
+	{
+		value = expression.substr(index, 6);
+		index += 6;
+		return Lexeme({ TypeLexeme::un_op, value, Priority::hight });
+	}
+	else if (expression.substr(index, 5) == "arctg")
+	{
+		value = expression.substr(index, 5);
+		index += 5;
+		return Lexeme({ TypeLexeme::un_op, value, Priority::hight });
+	}
+	else if (expression.substr(index, 2) == "pi")
+	{
+		value = to_string(PI);
+		index += 2;
+		return Lexeme{ TypeLexeme::number, value, Priority::number };
+	}
+	else if (expression.substr(index, 3) == "exp")
+	{
+		value = to_string(EXP);
+		index += 3;
+		return Lexeme{ TypeLexeme::number, value, Priority::number };
+	}
+	else if (expression[index] >= 'a' && expression[index] <= 'z')
+	{
+		value.push_back(expression[index++]);
+		return Lexeme({ TypeLexeme::variable, value, Priority::low });
+	}
+	return Lexeme({ TypeLexeme::error, value, Priority::low });
+}
+// нужно проконтролировать корректность скобок
+// счетчик скобок scopeCounter
+// if (scope == '(') leftScopeCounter++;
+// if (scope == ')') rightScopeCounter++;
+// leftScopeCounter == rightScopeCounter
+// (()))(
+std::vector<Lexeme> convertStrToLexemes(const std::string& s)
+{
+	int leftScopeCounter = 0;
+	int rightScopeCounter = 0;
+	std::vector<Lexeme> res;
+	LexemeState state = LexemeState::start;
+	size_t index = 0;
+	while (index < s.size())
+	{
+		const Lexeme lexeme = convertToLexeme(s, index, state);
+		if (state == LexemeState::start)
+		{
+			if (lexeme.type == TypeLexeme::un_op)
+			{
+				state = LexemeState::un_op;
+			}
+			else if (lexeme.type == TypeLexeme::variable || lexeme.type == TypeLexeme::number)
+			{
+				state = LexemeState::variable;
+			}
+			else if (lexeme.type == TypeLexeme::left_scope)
+			{
+				state = LexemeState::left_scope;
+				leftScopeCounter++;
+			}
+			else throw "Ошибка в стартовой лекскме";
+		}
+		else if (state == LexemeState::un_op)
+		{
+			if (lexeme.type == TypeLexeme::variable || lexeme.type == TypeLexeme::number)
+			{
+				state = LexemeState::variable;
+			}
+			else if (lexeme.type == TypeLexeme::left_scope)
+			{
+				state = LexemeState::left_scope;
+				leftScopeCounter++;
+			}
+			else if (lexeme.type == TypeLexeme::un_op)
+			{
+				state = LexemeState::un_op;
+			}
+			else throw "Ошибка в унарном операторе";
+		}
+		else if (state == LexemeState::variable)
+		{
+			if (lexeme.type == TypeLexeme::bin_op)
+			{
+				state = LexemeState::bin_op;
+			}
+			else if (lexeme.type == TypeLexeme::right_scope)
+			{
+				state = LexemeState::right_scope;
+				rightScopeCounter++;
+			}
+			else throw "Ошибка в переменной";
+		}
+		else if (state == LexemeState::bin_op)
+		{
+			if (lexeme.type == TypeLexeme::variable || lexeme.type == TypeLexeme::number)
+			{
+				state = LexemeState::variable;
+			}
+			else if (lexeme.type == TypeLexeme::left_scope)
+			{
+				state = LexemeState::left_scope;
+				leftScopeCounter++;
+			}
+			else if (lexeme.type == TypeLexeme::un_op)
+			{
+				state = LexemeState::un_op;
+			}
+			else throw "Ошибка в бинарном операторе";
+		}
+		else if (state == LexemeState::left_scope)
+		{
+			if (lexeme.type == TypeLexeme::left_scope)
+			{
+				state = LexemeState::left_scope;
+				leftScopeCounter++;
+			}
+			else if (lexeme.type == TypeLexeme::un_op)
+			{
+				state = LexemeState::un_op;
+			}
+			else if (lexeme.type == TypeLexeme::variable || lexeme.type == TypeLexeme::number)
+			{
+				state = LexemeState::variable;
+			}
+			else throw "Ошибка в левой скобке";
+		}
+		else if (state == LexemeState::right_scope)
+		{
+			if (lexeme.type == TypeLexeme::right_scope)
+			{
+				state = LexemeState::right_scope;
+				rightScopeCounter++;
+			}
+			else if (lexeme.type == TypeLexeme::bin_op)
+			{
+				state = LexemeState::bin_op;
+			}
+			else throw "Ошибка в правой скобке";
+		}
+		else throw "Ошибка";
+		res.push_back(lexeme);
+	}
+	if (leftScopeCounter != rightScopeCounter)
+	{
+		throw "Неправильное количество скобок";
+	}
+	return res;
+}
+std::vector<Lexeme> reversePolishNotation(const std::vector<Lexeme>& s)
+{
+	std::vector<Lexeme> result;
+	std::stack<Lexeme> stack;
+	for (const Lexeme& lexeme : s)
+	{
+		if (lexeme.type == TypeLexeme::variable || lexeme.type == TypeLexeme::number)
+		{
+			result.push_back(lexeme);
+		}
+		else if (lexeme.type == TypeLexeme::left_scope || lexeme.type == TypeLexeme::un_op)
+		{
+			stack.push(lexeme);
+		}
+		else if (lexeme.type == TypeLexeme::right_scope)
+		{
+			while (!stack.empty() && (stack.top().type != TypeLexeme::left_scope))
+			{
+				result.push_back(stack.top());
+				stack.pop();
+			}
+			stack.pop();
+		}
+		else if (lexeme.type == TypeLexeme::bin_op)
+		{
+			while (!stack.empty() && (stack.top().type == TypeLexeme::un_op || stack.top().priority >= lexeme.priority))
+			{
+				result.push_back(stack.top());
+				stack.pop();
+			}
+			stack.push(lexeme);
+		}
+	}
+	while (!stack.empty())
+	{
+		result.push_back(stack.top());
+		stack.pop();
+	}
+	return result;
+}
+double calculateReverse(const std::vector<Lexeme>& reverse)
+{
+	std::vector<Lexeme> stack;
+	for (const Lexeme& lexeme : reverse)
+	{
+		if (lexeme.type == TypeLexeme::number)
+		{
+			Lexeme lex = { TypeLexeme::number, lexeme.value, Priority::number };
+			stack.push_back(lex);
+		}
+		else if (lexeme.type == TypeLexeme::un_op)
+		{
+			if (lexeme.value == "-")
+			{
+				stack.back().value = std::to_string(-stod(stack.back().value));
+			}
+			if (lexeme.value == "sin")
+			{
+				stack.back().value = std::to_string(sin(stod(stack.back().value)));
+			}
+			if (lexeme.value == "cos")
+			{
+				stack.back().value = std::to_string(cos(stod(stack.back().value)));
+			}
+			if (lexeme.value == "tg")
+			{
+				stack.back().value = std::to_string(tan(stod(stack.back().value)));
+			}
+			if (lexeme.value == "ctg")
+			{
+				stack.back().value = std::to_string(1 / tan(stod(stack.back().value)));
+			}
+			if (lexeme.value == "arcsin")
+			{
+				stack.back().value = std::to_string(asin(stod(stack.back().value)));
+			}
+			if (lexeme.value == "arccos")
+			{
+				stack.back().value = std::to_string(acos(stod(stack.back().value)));
+			}
+			if (lexeme.value == "arctg")
+			{
+				stack.back().value = std::to_string(atan(stod(stack.back().value)));
+			}
+			if (lexeme.value == "arcctg")
+			{
+				stack.back().value = std::to_string((PI / 2) - atan(stod(stack.back().value)));
+			}
+			if (lexeme.value == "ln")
+			{
+				stack.back().value = std::to_string(log(stod(stack.back().value)));
+			}
+		}
+		else if (lexeme.type == TypeLexeme::bin_op)
+		{
+			Lexeme x2 = stack.back();
+			stack.pop_back();
+			Lexeme x1 = stack.back();
+			stack.pop_back();
+			double x = std::stod(x1.value);
+			double y = std::stod(x2.value);
+			std::string tmp;
+			if (lexeme.value == "+")
+			{
+				tmp = std::to_string(x + y);
+			}
+			else if (lexeme.value == "-")
+			{
+				tmp = std::to_string(x - y);
+			}
+			else if (lexeme.value == "*")
+			{
+				tmp = std::to_string(x * y);
+			}
+			else if (lexeme.value == "/")
+			{
+				if (y == 0)
+				{
+					cout << "Ошибка: деление на ноль" << endl;
+					return 0;
+				}
+				tmp = std::to_string(x / y);
+			}
+			else if (lexeme.value == "^")
+			{
+				tmp = std::to_string(pow(x, y));
+			}
+			Lexeme result = { TypeLexeme::number, tmp, Priority::number };
+			stack.push_back(result);
+		}
+	}
+	double result = std::stod(stack.back().value);
+	return result;
+}
+void calculation(const std::string& s)
+{
+	std::vector<Lexeme> lexems = convertStrToLexemes(s);
+	std::string variables;
+	for (size_t i = 0; i < lexems.size(); i++)
+	{
+		if (lexems[i].type == TypeLexeme::variable)
+		{
+			variables += lexems[i].value[0];
+		}
+	}
+	for (size_t i = 0; i < variables.size(); i++)
+	{
+		double variable;
+		std::cout << "Введите значение переменной " << variables[i] << ":" << std::endl;
+		std::cin >> variable;
+		for (size_t j = 0; j < lexems.size(); j++)
+		{
+			if (lexems[j].value[0] == variables[i])
+			{
+				lexems[j].value = std::to_string(variable);
+				lexems[j].type = TypeLexeme::number;
+			}
+		}
+	}
+	std::vector<Lexeme> reversePolishNotationexp = reversePolishNotation(lexems);
+	std::cout << "Результат вычислений: " << calculateReverse(reversePolishNotationexp) << std::endl;
+}
+bool check_arithmetic_expression(const std::string& s)
+{
+	try
+	{
+		vector<Lexeme> lexeme = convertStrToLexemes(s);
+		vector<Lexeme> reversePolishNotationexp = reversePolishNotation(lexeme);
+	}
+	catch (const char* s)
+	{
+		cout << s << endl;
+		return false;
+	}
+	return true;
+}
+int main()
+{
+	setlocale(LC_ALL, "Russian");
+	std::string s;
+	while(1)
+	{
+		cout << "Введите выражение: \n";
+		getline(cin, s);
+		if (check_arithmetic_expression(s))
+		{
+			calculation(s);
+		}
+		cout << "Хотите ввести новое выражение?\n";
+		getline(cin, s);
+		if (s == "Нет" || s == "нет" || s == "No" || s == "no")
+			break;
+	}
+	return 0;
+}
