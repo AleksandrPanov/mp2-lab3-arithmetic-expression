@@ -18,9 +18,10 @@ enum class TypeLexeme {
 
 enum class Priority {
 	number, 
-	high,
-	low,
-	mid,
+	plus,
+	mult,
+	pow,
+	un_op,
 	scope,
 };
 
@@ -46,31 +47,30 @@ Lexeme crToLexeme(const std::string& exp, size_t& index, StateLexeme state) {
 	std::string val;
 	if (exp[index] == '*' || exp[index] == '/')
 	{
-		val.push_back(exp[index]);
-		index++;
-		return Lexeme({ TypeLexeme::bin_op, val, Priority::mid });
+		val.push_back(exp[index++]);
+		return Lexeme({ TypeLexeme::bin_op, val, Priority::mult });
 	}
 	else if (exp[index] == '+')
 	{
 		val.push_back(exp[index++]);
-		return Lexeme({ TypeLexeme::bin_op, val, Priority::low });
+		return Lexeme({ TypeLexeme::bin_op, val, Priority::plus });
 	}
 	else if (exp[index] == '-')
 	{
 		if (state == StateLexeme::start || state == StateLexeme::left_scope)
 		{
-			return Lexeme({ TypeLexeme::bin_op ,val, Priority::low });
+			return Lexeme({ TypeLexeme::un_op ,val, Priority::un_op });
 		}
 		else if (state == StateLexeme::variable || state == StateLexeme::number || state == StateLexeme::right_scope)
 		{
-			return Lexeme{ TypeLexeme::un_op,val ,Priority::high};
+			return Lexeme{ TypeLexeme::bin_op,val ,Priority::plus};
 		}
 	}
 
 	else if (exp[index] == '^')
 	{
 		val.push_back(exp[index++]);
-		return Lexeme({TypeLexeme::bin_op, val, Priority::high});
+		return Lexeme({TypeLexeme::bin_op, val, Priority::pow});
 	}
 
 	else if (exp[index] == '(')
@@ -85,38 +85,11 @@ Lexeme crToLexeme(const std::string& exp, size_t& index, StateLexeme state) {
 
 	}
 
-	else if (exp.substr(index, 3) == "sin" || exp.substr(index, 3) == "cos" || exp.substr(index, 3) == "sqrt")
+	else if (exp.substr(index, 3) == "sin" || exp.substr(index, 3) == "cos" || exp.substr(index, 3) == "sqrt" || exp.substr(index, 3) == "tg" || exp.substr(index, 3) == "ctg" || exp.substr(index, 3) == "ln" || exp.substr(index, 3) == "arcsin" || exp.substr(index, 3) == "arccos" || exp.substr(index, 3) == "arctg" || exp.substr(index, 3) == "arcctg")
 	{
 		val = exp.substr(index, 3);
 		index += 3;
-		return Lexeme({ TypeLexeme::un_op, val, Priority::high });
-	}
-
-	else if (exp.substr(index, 2) == "ln")
-	{
-		val = exp.substr(index, 2);
-		index += 2;
-		return Lexeme({ TypeLexeme::un_op, val, Priority::high});
-	}
-
-	else if (exp.substr(index, 2) == "pi")
-	{
-		val = to_string(PI);
-		index += 2;
-		return Lexeme{ TypeLexeme::number, val, Priority::number };
-	}
-
-	else if (exp.substr(index, 3) == "exp")
-	{
-		val = to_string(EXP);
-		index += 3;
-		return Lexeme{ TypeLexeme::number, val, Priority::number };
-	}
-
-	else if (exp[index] >= 'a' && exp[index] <= 'z')
-	{
-		val.push_back(exp[index++]);
-		return Lexeme({ TypeLexeme::variable, val, Priority::low });
+		return Lexeme({ TypeLexeme::un_op, val, Priority::un_op});
 	}
 
 	else if (exp[index] >= '0' && exp[index] <= '9')
@@ -128,7 +101,7 @@ Lexeme crToLexeme(const std::string& exp, size_t& index, StateLexeme state) {
 		return Lexeme({ TypeLexeme::number, val, Priority::number });
 	}
 
-	return Lexeme({ TypeLexeme::error, val, Priority::low });
+	return Lexeme({ TypeLexeme::error, val, Priority::plus });
 }
 
 std::vector<Lexeme> convertStrToLexeme(const std::string& str)
@@ -137,19 +110,15 @@ std::vector<Lexeme> convertStrToLexeme(const std::string& str)
 	size_t index = 0;
 	std::vector<Lexeme> res;
 	StateLexeme state = StateLexeme::start;
-	while (index < str.size())
+	for (index; index < str.size(); index++)
 	{
 		const Lexeme lexeme = crToLexeme(str, index, state);
 		if (state == StateLexeme::start)
 		{
 			if (lexeme.type == TypeLexeme::un_op)
-			{
 				state = StateLexeme::un_op;
-			}
 			else if (lexeme.type == TypeLexeme::variable || lexeme.type == TypeLexeme::number)
-			{
 				state = StateLexeme::variable;
-			}
 			else if (lexeme.type == TypeLexeme::left_scope)
 			{
 				state = StateLexeme::left_scope;
@@ -184,7 +153,7 @@ std::vector<Lexeme> convertStrToLexeme(const std::string& str)
 			else if (lexeme.type == TypeLexeme::right_scope)
 			{
 				state = StateLexeme::right_scope;
-				counter--;
+				counter++;
 			}
 			else throw "Error";
 		}
@@ -307,6 +276,18 @@ double calcReverse(const std::vector<Lexeme>& reverse)
 				stack.push_back({ TypeLexeme::number, to_string(sin(a)), Priority::number });
 			else if (lex.value == "cos")
 				stack.push_back({ TypeLexeme::number, to_string(cos(a)), Priority::number });
+			else if (lex.value == "tg")
+				stack.push_back({ TypeLexeme::number, to_string(tan(a)), Priority::number });
+			else if (lex.value == "ctg")
+				stack.push_back({ TypeLexeme::number, to_string(1 / tan(a)), Priority::number });
+			else if (lex.value == "arcsin")
+				stack.push_back({ TypeLexeme::number, to_string(asin(a)), Priority::number });
+			else if (lex.value == "arccos")
+				stack.push_back({ TypeLexeme::number, to_string(acos(a)), Priority::number });
+			else if (lex.value == "arctg")
+				stack.push_back({ TypeLexeme::number, to_string(atan(a)), Priority::number });
+			else if (lex.value == "arcctg")
+				stack.push_back({ TypeLexeme::number, to_string(PI / 2 - atan(a)), Priority::number });
 			else if (lex.value == "sqrt")
 				stack.push_back({ TypeLexeme::number, to_string(pow(a, 0.5)), Priority::number });
 			else if (lex.value == "ln")
